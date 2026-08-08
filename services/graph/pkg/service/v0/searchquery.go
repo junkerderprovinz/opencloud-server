@@ -188,6 +188,9 @@ func libregraphAggregationsToSearch(in []libregraph.AggregationOption) []*search
 		if a.MetricKind != nil {
 			agg.MetricKind = metricKindFromLibregraph(*a.MetricKind)
 		}
+		if a.GeohashPrecision != nil {
+			agg.GeohashPrecision = *a.GeohashPrecision
+		}
 		out = append(out, agg)
 	}
 	return out
