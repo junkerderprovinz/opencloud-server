@@ -2,6 +2,7 @@ package bleve
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -92,7 +93,11 @@ func (b *Backend) Search(_ context.Context, sir *searchService.SearchIndexReques
 	}
 
 	for _, agg := range sir.GetAggregations() {
-		bleveReq.AddFacet(agg.GetField(), newBleveFacetRequest(agg))
+		fr, err := newBleveFacetRequest(agg)
+		if err != nil {
+			return nil, err
+		}
+		bleveReq.AddFacet(agg.GetField(), fr)
 	}
 
 	// Sub-aggregations need the matched hit set, not just count facets: widen
@@ -187,10 +192,19 @@ func needsSubAggScan(aggs []*searchService.AggregationOption) bool {
 // after cross-space merge.
 const defaultFacetSize = 1000
 
-func newBleveFacetRequest(agg *searchService.AggregationOption) *bleve.FacetRequest {
+func newBleveFacetRequest(agg *searchService.AggregationOption) (*bleve.FacetRequest, error) {
 	size := int(agg.GetSize())
 	if size <= 0 {
 		size = defaultFacetSize
+	}
+	// Geohash: terms facet on the precomputed geohash-prefix sibling field of
+	// the requested precision (bleve has no native geohash-grid aggregation).
+	if p := int(agg.GetGeohashPrecision()); p > 0 {
+		field, ok := searchQuery.ResolveGeohashField(agg.GetField(), p)
+		if !ok {
+			return nil, fmt.Errorf("geohash aggregation on non-geo field %q", agg.GetField())
+		}
+		return bleve.NewFacetRequest(field, size), nil
 	}
 	fr := bleve.NewFacetRequest(agg.GetField(), size)
 	for _, r := range aggregationRanges(agg) {
@@ -198,7 +212,7 @@ func newBleveFacetRequest(agg *searchService.AggregationOption) *bleve.FacetRequ
 		maxP := parseFloatPtr(r.GetTo())
 		fr.AddNumericRange(rangeBucketKey(r), minP, maxP)
 	}
-	return fr
+	return fr, nil
 }
 
 func extractBleveAggregations(res *bleve.SearchResult, aggs []*searchService.AggregationOption) []*searchService.AggregationResult {
