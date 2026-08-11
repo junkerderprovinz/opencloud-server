@@ -2512,10 +2512,14 @@ def opencloudServer(storage = "decomposed", depends_on = [], deploy_type = "", e
 
     if deploy_type == "cs3api_validator":
         environment["GATEWAY_GRPC_ADDR"] = "0.0.0.0:9142"  #  make gateway available to cs3api-validator
+        environment["STORAGE_USERS_HTTP_ADDR"] = "0.0.0.0:9158"  # make dataprovider available to wopi server
+        environment["STORAGE_USERS_DATA_SERVER_URL"] = "http://opencloud-server:9158/data"  # make dataprovider routable by wopi server
         environment["OC_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD"] = False
 
     if deploy_type == "wopi_validator":
         environment["GATEWAY_GRPC_ADDR"] = "0.0.0.0:9142"  # make gateway available to wopi server
+        environment["STORAGE_USERS_HTTP_ADDR"] = "0.0.0.0:9158"  # make dataprovider available to wopi server
+        environment["STORAGE_USERS_DATA_SERVER_URL"] = "http://opencloud-server:9158/data"  # make dataprovider routable by wopi server
         environment["APP_PROVIDER_EXTERNAL_ADDR"] = "eu.opencloud.api.app-provider"
         environment["APP_PROVIDER_DRIVER"] = "wopi"
         environment["APP_PROVIDER_WOPI_APP_NAME"] = "FakeOffice"
