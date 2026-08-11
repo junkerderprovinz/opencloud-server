@@ -82,6 +82,7 @@ func DefaultConfig() *config.Config {
 				DisablePersistence: true,
 			},
 		},
+		TransferTimeout:       24 * time.Hour,
 		AccountBackend:        "cs3",
 		UserOIDCClaim:         "preferred_username",
 		UserCS3Claim:          "username",
@@ -336,6 +337,10 @@ func EnsureDefaults(cfg *config.Config) {
 
 	if cfg.Reva == nil && cfg.Commons != nil {
 		cfg.Reva = structs.CopyOrZeroValue(cfg.Commons.Reva)
+	}
+
+	if cfg.TransferSecret == "" && cfg.Commons != nil && cfg.Commons.TransferSecret != "" {
+		cfg.TransferSecret = cfg.Commons.TransferSecret
 	}
 
 	if cfg.GRPCClientTLS == nil && cfg.Commons != nil {

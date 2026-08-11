@@ -87,6 +87,7 @@ func DefaultConfig() *config.Config {
 		Reva:                    shared.DefaultRevaConfig(),
 		DataServerURL:           "http://localhost:9158/data",
 		DataGatewayURL:          "http://localhost:9140/data",
+		ExposeDataServer:        true,
 		RevaGatewayGRPCAddr:     "127.0.0.1:9142",
 		TransferExpires:         86400,
 		UploadExpiration:        24 * 60 * 60,
