@@ -309,6 +309,42 @@ func (m *AggregationOption) UnmarshalJSON(b []byte) error {
 
 var _ json.Unmarshaler = (*AggregationOption)(nil)
 
+// SortPropertyJSONMarshaler describes the default jsonpb.Marshaler used by all
+// instances of SortProperty. This struct is safe to replace or modify but
+// should not be done so concurrently.
+var SortPropertyJSONMarshaler = new(jsonpb.Marshaler)
+
+// MarshalJSON satisfies the encoding/json Marshaler interface. This method
+// uses the more correct jsonpb package to correctly marshal the message.
+func (m *SortProperty) MarshalJSON() ([]byte, error) {
+	if m == nil {
+		return json.Marshal(nil)
+	}
+
+	buf := &bytes.Buffer{}
+
+	if err := SortPropertyJSONMarshaler.Marshal(buf, m); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+var _ json.Marshaler = (*SortProperty)(nil)
+
+// SortPropertyJSONUnmarshaler describes the default jsonpb.Unmarshaler used by all
+// instances of SortProperty. This struct is safe to replace or modify but
+// should not be done so concurrently.
+var SortPropertyJSONUnmarshaler = new(jsonpb.Unmarshaler)
+
+// UnmarshalJSON satisfies the encoding/json Unmarshaler interface. This method
+// uses the more correct jsonpb package to correctly unmarshal the message.
+func (m *SortProperty) UnmarshalJSON(b []byte) error {
+	return SortPropertyJSONUnmarshaler.Unmarshal(bytes.NewReader(b), m)
+}
+
+var _ json.Unmarshaler = (*SortProperty)(nil)
+
 // BucketDefinitionJSONMarshaler describes the default jsonpb.Marshaler used by all
 // instances of BucketDefinition. This struct is safe to replace or modify but
 // should not be done so concurrently.
