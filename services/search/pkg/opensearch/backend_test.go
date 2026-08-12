@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	opensearchgo "github.com/opensearch-project/opensearch-go/v4"
 	opensearchgoAPI "github.com/opensearch-project/opensearch-go/v4/opensearchapi"
@@ -71,6 +72,89 @@ func TestEngine_Search(t *testing.T) {
 		require.Len(t, resp.Matches, 1)
 		require.Equal(t, int32(1), resp.TotalMatches)
 		require.Equal(t, document.ID, fmt.Sprintf("%s$%s!%s", resp.Matches[0].Entity.Id.StorageId, resp.Matches[0].Entity.Id.SpaceId, resp.Matches[0].Entity.Id.OpaqueId))
+	})
+}
+
+func TestEngine_Search_Sorting(t *testing.T) {
+	indexName := "opencloud-test-engine-search-sorting"
+	tc := opensearchtest.NewDefaultTestClient(t, defaultConfig.Engine.OpenSearch.Client)
+	tc.Require.IndicesReset([]string{indexName})
+	tc.Require.IndicesCount([]string{indexName}, nil, 0)
+
+	defer tc.Require.IndicesDelete([]string{indexName})
+
+	backend, err := opensearch.NewBackend(t.Context(), indexName, tc.Client(), log.NopLogger())
+	require.NoError(t, err)
+
+	// insertion order deliberately differs from every sort order
+	for i, doc := range []struct {
+		name  string
+		size  uint64
+		taken string
+	}{
+		{"c.jpg", 300, "2020-06-15T12:00:00Z"},
+		{"a.jpg", 100, "2022-01-01T08:00:00Z"},
+		{"d.jpg", 400, "2019-03-03T10:30:00Z"},
+		{"b.jpg", 200, "2021-11-20T18:45:00Z"},
+	} {
+		resource := opensearchtest.Testdata.Resources.File
+		resource.ID = fmt.Sprintf("1$1!%d", 4001+i)
+		resource.Name = doc.name
+		resource.Path = "./parent d!r/" + doc.name
+		resource.Size = doc.size
+		taken, err := time.Parse(time.RFC3339, doc.taken)
+		require.NoError(t, err)
+		photo := *resource.Photo
+		photo.TakenDateTime = &taken
+		resource.Photo = &photo
+		tc.Require.DocumentCreate(indexName, resource.ID, strings.NewReader(opensearchtest.JSONMustMarshal(t, resource)))
+	}
+	tc.Require.IndicesCount([]string{indexName}, nil, 4)
+
+	searchSorted := func(pageSize int32, orderBy ...*searchService.SortProperty) (*searchService.SearchIndexResponse, error) {
+		return backend.Search(t.Context(), &searchService.SearchIndexRequest{
+			Query:    "mediatype:image",
+			PageSize: pageSize,
+			OrderBy:  orderBy,
+		})
+	}
+
+	matchNames := func(resp *searchService.SearchIndexResponse) []string {
+		names := make([]string, 0, len(resp.Matches))
+		for _, m := range resp.Matches {
+			names = append(names, m.Entity.Name)
+		}
+		return names
+	}
+
+	t.Run("sorts by photo.takenDateTime descending", func(t *testing.T) {
+		resp, err := searchSorted(10, &searchService.SortProperty{Name: "photo.takenDateTime", IsDescending: true})
+		require.NoError(t, err)
+		require.Equal(t, []string{"a.jpg", "b.jpg", "c.jpg", "d.jpg"}, matchNames(resp))
+	})
+
+	t.Run("sorts by name ascending", func(t *testing.T) {
+		resp, err := searchSorted(10, &searchService.SortProperty{Name: "name"})
+		require.NoError(t, err)
+		require.Equal(t, []string{"a.jpg", "b.jpg", "c.jpg", "d.jpg"}, matchNames(resp))
+	})
+
+	t.Run("sorts by size ascending", func(t *testing.T) {
+		resp, err := searchSorted(10, &searchService.SortProperty{Name: "size"})
+		require.NoError(t, err)
+		require.Equal(t, []string{"a.jpg", "b.jpg", "c.jpg", "d.jpg"}, matchNames(resp))
+	})
+
+	t.Run("returns the head of the sorted order when the page is smaller than the result set", func(t *testing.T) {
+		resp, err := searchSorted(2, &searchService.SortProperty{Name: "photo.takenDateTime"})
+		require.NoError(t, err)
+		require.Equal(t, int32(4), resp.TotalMatches)
+		require.Equal(t, []string{"d.jpg", "c.jpg"}, matchNames(resp))
+	})
+
+	t.Run("rejects sorting by an unsortable field", func(t *testing.T) {
+		_, err := searchSorted(10, &searchService.SortProperty{Name: "definitelyNotAField"})
+		require.Error(t, err)
 	})
 }
 

@@ -73,6 +73,13 @@ func buildResourceMapping() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Name is analyzed (lowercaseKeyword) and therefore a text field, which
+	// OpenSearch refuses to sort on without fielddata. The keyword tokenizer
+	// emits one term per document, so the fielddata cache stays as small as a
+	// doc_values column would be.
+	if nameProps, ok := props["Name"].(map[string]any); ok {
+		nameProps["fielddata"] = true
+	}
 
 	index := map[string]any{
 		"settings": map[string]any{
