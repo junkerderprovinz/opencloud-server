@@ -84,7 +84,16 @@ func CompareMatches(a, b *searchmsg.Match, orderBy []*searchsvc.SortProperty) in
 		c := 0
 		switch {
 		case ka.isString:
-			c = strings.Compare(ka.str, kb.str)
+			sa, sb := ka.str, kb.str
+			// lowercase-analyzed fields (e.g. Name) are sorted by their
+			// lowercased terms in the index; compare the same way here so the
+			// cross-space merge preserves the backend order.
+			if field, ok := SortIndexField(sp.GetName()); ok {
+				if _, lower := LowercaseValueFields()[field]; lower {
+					sa, sb = strings.ToLower(sa), strings.ToLower(sb)
+				}
+			}
+			c = strings.Compare(sa, sb)
 		case ka.num < kb.num:
 			c = -1
 		case ka.num > kb.num:
